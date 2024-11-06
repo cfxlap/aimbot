@@ -1,0 +1,88 @@
+-- LocalScript to aim assist towards the nearest player's head with a lock-on notification that persists
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = game.Workspace.CurrentCamera
+
+local AssistEnabled = false  -- Keeps track of aim assist status
+local TargetHead = nil  -- Stores the current target's head
+
+-- UI Setup for lock-on notification
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local LockOnLabel = Instance.new("TextLabel")
+LockOnLabel.Size = UDim2.new(0, 200, 0, 50)
+LockOnLabel.Position = UDim2.new(0.5, -100, 0.1, 0)
+LockOnLabel.BackgroundTransparency = 0.5
+LockOnLabel.Text = "LOCKED BITCH"
+LockOnLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+LockOnLabel.TextScaled = true
+LockOnLabel.Visible = false  -- Hidden initially
+LockOnLabel.Parent = ScreenGui
+
+local function getNearestPlayer()
+    local nearestPlayer = nil
+    local shortestDistance = math.huge
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
+            local head = player.Character.Head
+            local distance = (LocalPlayer.Character.Head.Position - head.Position).Magnitude
+            if distance < shortestDistance then
+                nearestPlayer = head
+                shortestDistance = distance
+            end
+        end
+    end
+
+    return nearestPlayer
+end
+
+local function startAimAssist()
+    if not TargetHead then  -- Only lock on if no current target
+        TargetHead = getNearestPlayer()  -- Lock onto the nearest player's head
+        if TargetHead then
+            LockOnLabel.Visible = true  -- Show the lock-on notification
+        end
+    end
+end
+
+local function updateAimAssist()
+    if TargetHead then
+        -- Smoothly set the camera to look at the target's head
+        Camera.CFrame = CFrame.new(Camera.CFrame.Position, TargetHead.Position)
+    end
+end
+
+local function stopAimAssist()
+    -- This will not be triggered unless you manually clear the target
+    -- Lock-on will persist until Shift is pressed again.
+end
+
+-- Start aim assist and show notification when Shift is pressed
+UserInputService.InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.LeftShift and not AssistEnabled then
+        AssistEnabled = true
+        startAimAssist()
+    end
+end)
+
+-- Allow the user to reset the lock-on to a new target by pressing Shift again
+UserInputService.InputEnded:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.LeftShift then
+        AssistEnabled = false
+        -- Reset lock-on to a new target when Shift is pressed again
+        TargetHead = nil
+        LockOnLabel.Visible = false  -- Hide the lock-on notification
+    end
+end)
+
+-- Update the camera if aim assist is active
+RunService.RenderStepped:Connect(function()
+    if AssistEnabled then
+        updateAimAssist()
+    end
+end)
